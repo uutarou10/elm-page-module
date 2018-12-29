@@ -5,6 +5,8 @@ import Browser.Navigation as Nav
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
+import Page.Home as Home
+import Page.Sub as Sub
 import Url
 import Url.Parser as Parser
 
@@ -21,13 +23,16 @@ type alias Model =
 
 type Page
     = NotFound
-    | Home
-    | Sub
+    | Home Home.Model
+    | Sub Sub.Model
 
 
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
 init flags url key =
-    ( Model key Home, Cmd.none )
+    stepUrl url
+        { key = key
+        , page = NotFound
+        }
 
 
 
@@ -37,23 +42,91 @@ init flags url key =
 type Msg
     = LinkClicked Browser.UrlRequest
     | UrlChanged Url.Url
+    | HomeMsg Home.Msg
+    | SubMsg Sub.Msg
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
-update msg model =
-    ( model, Cmd.none )
+update message model =
+    case message of
+        LinkClicked urlRequest ->
+            case urlRequest of
+                Browser.Internal url ->
+                    ( model
+                    , Nav.pushUrl model.key (Url.toString url)
+                    )
+
+                Browser.External href ->
+                    ( model
+                    , Nav.load href
+                    )
+
+        UrlChanged url ->
+            stepUrl url model
+
+        HomeMsg msg ->
+            case model.page of
+                Home home ->
+                    stepHome model (Home.update msg home)
+
+                _ ->
+                    ( model, Cmd.none )
+
+        SubMsg msg ->
+            case model.page of
+                Sub sub ->
+                    stepSub model (Sub.update msg sub)
+
+                _ ->
+                    ( model, Cmd.none )
+
+
+stepHome : Model -> ( Home.Model, Cmd Home.Msg ) -> ( Model, Cmd Msg )
+stepHome model ( homeModel, homeMsg ) =
+    ( { model | page = Home homeModel }
+    , Cmd.map HomeMsg homeMsg
+    )
+
+
+stepSub : Model -> ( Sub.Model, Cmd Sub.Msg ) -> ( Model, Cmd Msg )
+stepSub model ( subModel, subMsg ) =
+    ( { model | page = Sub subModel }
+    , Cmd.map SubMsg subMsg
+    )
 
 
 
 ---- NAVIGATION ----
+-- parser : Parser.Parser (Page -> a) a
+-- parser =
+--     Parser.oneOf
+--         [ Parser.map Home Parser.top
+--         , Parser.map Sub (Parser.s "sub")
+--         ]
+-- 新しいurlと現在のmodelを受け取って新しいmodelを返す
 
 
-parser : Parser.Parser (Page -> a) a
-parser =
-    Parser.oneOf
-        [ Parser.map Home Parser.top
-        , Parser.map Sub (Parser.s "sub")
-        ]
+stepUrl : Url.Url -> Model -> ( Model, Cmd Msg )
+stepUrl url model =
+    let
+        parser =
+            Parser.oneOf
+                [ Parser.map
+                    (stepHome model Home.init)
+                    Parser.top
+                , Parser.map
+                    (stepSub model Sub.init)
+                    (Parser.s "sub")
+                ]
+    in
+    case Parser.parse parser url of
+        Just answer ->
+            answer
+
+        Nothing ->
+            ( { model | page = NotFound }
+            , Cmd.none
+            )
 
 
 
@@ -71,9 +144,25 @@ subscriptions model =
 
 view : Model -> Browser.Document Msg
 view model =
-    { title = "TITLE"
-    , body = [ div [] [ text "hello" ] ]
-    }
+    case model.page of
+        NotFound ->
+            { title = "NotFound"
+            , body = [ text "notfound" ]
+            }
+
+        Home home ->
+            { title = "home"
+            , body =
+                [ Html.map HomeMsg <| Home.view home
+                ]
+            }
+
+        Sub sub ->
+            { title = "sub"
+            , body =
+                [ Html.map SubMsg <| Sub.view sub
+                ]
+            }
 
 
 

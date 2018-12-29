@@ -1,4 +1,4 @@
-module Page.Home exposing (Model)
+module Page.Home exposing (Model, Msg(..), init, update, view)
 
 import Browser
 import Html exposing (..)
@@ -22,8 +22,14 @@ update msg model =
     ( model, Cmd.none )
 
 
-view : Model -> Browser.Document Msg
+
+-- view : Model -> Browser.Document Msg
+-- view model =
+--     { title = "Home"
+--     , body = [ text model.test ]
+--     }
+
+
+view : Model -> Html Msg
 view model =
-    { title = "Home"
-    , body = [ text model.test ]
-    }
+    text model.test
